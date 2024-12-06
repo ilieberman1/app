@@ -1,4 +1,3 @@
-// game.js
 import * as THREE from 'three';
 import Player from './player.js';
 import CopCar from './copcar.js';
@@ -50,6 +49,9 @@ export default class Game {
         this.gameStarted = false;
         this.sirenInterval = null;
         this.sirenOn = false;
+
+        // Load the stored number of coins from localStorage
+        this.coins = parseInt(localStorage.getItem('coins') || '0', 10);
     }
 
     async init() {
@@ -68,13 +70,13 @@ export default class Game {
         this.createEnvironment();
         await this.loadPlayerModel();
     }
-    //renders the game
+
     setupRenderer() {
         this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
         this.renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(this.renderer.domElement);
     }
-    //sets up the user camera to follow the user's car. 
+
     setupCamera() {
         this.camera = new THREE.PerspectiveCamera(
             75,
@@ -83,7 +85,7 @@ export default class Game {
             1000
         );
     }
-    //adds the ambient lighting within the game to make the game more appealing. 
+
     addLighting() {
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
         this.scene.add(ambientLight);
@@ -100,7 +102,7 @@ export default class Game {
         this.sunMesh.position.set(-100, 100, -100);
         this.scene.add(this.sunMesh);
     }
-    //creates the clouds and color within the sky to make the game more visually appealing. 
+
     createProceduralSky() {
         const sky = new Sky();
         sky.scale.setScalar(450000);
@@ -125,27 +127,27 @@ export default class Game {
 
         sky.material.uniforms['sunPosition'].value.copy(this.sunLight.position);
     }
-    //used to load a smoketexture but functionality no longer works as intended.
+
     loadSmokeTexture() {
         const textureLoader = new THREE.TextureLoader();
-        //this.smokeTexture = textureLoader.load('smoke.png'); // Ensure 'smoke.png' is in your project directory
+        //this.smokeTexture = textureLoader.load('smoke.png');
     }
-    //sets up the input handler
+
     setupEventListeners() {
         this.inputHandler = new InputHandler(this);
     }
-    //sets up all of the trees, mountains, and clouds within the game by calling those methods.
+
     createEnvironment() {
         this.createTrees();
         this.createMountain();
         this.createClouds();
     }
-    // creates an infinite amount of trees that spawn for as long as the user is playing the game. 
+
     createTrees() {
         const treeGeometry = new THREE.ConeGeometry(0.5, 2, 8);
         const trunkGeometry = new THREE.CylinderGeometry(0.2, 0.2, 1, 8);
-        const treeMaterial = new THREE.MeshPhongMaterial({ color: 0x228b22 }); // Green color
-        const trunkMaterial = new THREE.MeshPhongMaterial({ color: 0x8b4513 }); // Brown color
+        const treeMaterial = new THREE.MeshPhongMaterial({ color: 0x228b22 });
+        const trunkMaterial = new THREE.MeshPhongMaterial({ color: 0x8b4513 });
 
         for (let i = 0; i < 500; i++) {
             const tree = new THREE.Group();
@@ -167,20 +169,20 @@ export default class Game {
             this.scene.add(tree);
         }
     }
-    //creates mountains that are supposed to spawn in the background but doesn't work as intended yet. 
+
     createMountain() {
         const mountainGeometry = new THREE.ConeGeometry(50, 100, 32);
         const mountainMaterial = new THREE.MeshPhongMaterial({ color: 0x8B4513 });
         this.mountain = new THREE.Mesh(mountainGeometry, mountainMaterial);
         this.scene.add(this.mountain);
     }
-    //creates multiple clouds by calling the createCloud method
+
     createClouds() {
         for (let i = 0; i < 50; i++) {
             this.createCloud();
         }
     }
-    //creates realistic clouds using three.js
+
     createCloud() {
         const cloudGeometry = new THREE.SphereGeometry(5, 32, 32);
         const cloudMaterial = new THREE.MeshPhongMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 });
@@ -208,14 +210,13 @@ export default class Game {
         this.scene.add(cloud);
         this.clouds.push(cloud);
     }
-    //loads in objects required for playingthe game. this includes the user's porsche, the cop car, the traffic car and the home screen. 
+
     async loadPlayerModel() {
-        // Show loading screen
         this.loadingScreen.style.display = 'flex';
 
         const fbxLoader = new FBXLoader();
         try {
-            const object = await fbxLoader.loadAsync('porsche.fbx'); // Ensure 'porsche.fbx' is in your project directory
+            const object = await fbxLoader.loadAsync('porsche.fbx');
             this.player = new Player(this, object);
             this.scene.add(this.player.mesh);
 
@@ -232,12 +233,13 @@ export default class Game {
 
             this.modelLoaded = true;
 
-            // Enable Start button and hide loading screen
             this.startButton.disabled = false;
             this.loadingScreen.style.display = 'none';
             this.mainMenu.style.display = 'flex';
 
-            // Add event listener to Start button
+            // Update the coin display on the main menu
+            document.getElementById('coin-display').textContent = 'Coins: ' + this.coins;
+
             this.startButton.addEventListener('click', () => {
                 if (!this.modelLoaded) {
                     alert('The car model is still loading. Please wait a moment.');
@@ -251,49 +253,39 @@ export default class Game {
             this.loadingScreen.textContent = `Error loading model: ${error.message}. Please check the file path.`;
         }
     }
-    //starts the intro animation detailed in introanimation.js
+
     startIntroAnimation() {
         this.gameStarted = true;
         this.introAnimation = new IntroAnimation(this);
         this.introAnimation.start();
     }
-    //renders the 
+
     animate() {
         if (this.gameOver || !this.player.mesh) return;
 
         requestAnimationFrame(() => this.animate());
 
         const deltaTime = 1;
-
         this.update(deltaTime);
 
         this.renderer.render(this.scene, this.camera);
     }
 
     update(deltaTime) {
-        // Update player
         this.player.update(deltaTime);
-
-        // Update cop car
         this.copCar.update(deltaTime);
 
-        // Update traffic cars
         this.trafficCars.forEach((trafficCar) => {
             trafficCar.update(deltaTime);
         });
 
-        // Update trees
         this.trees.forEach((tree) => {
-            tree.position.z -= this.playerSpeed; // Move with the player
+            tree.position.z -= this.playerSpeed;
             if (tree.position.z < this.player.mesh.position.z - 200) {
                 tree.position.z = this.player.mesh.position.z + this.roadLength / 2;
             }
         });
 
-        // Update smoke particles
-        //this.updateSmokeParticles();
-
-        // Update camera position to follow the player
         this.camera.position.set(
             this.player.mesh.position.x,
             5,
@@ -301,34 +293,16 @@ export default class Game {
         );
         this.camera.lookAt(this.player.mesh.position);
 
-        // Update clouds
         this.updateClouds();
-
-        // Update sun and mountain positions
         this.updateEnvironment();
 
-        // Update score
         this.score += 1;
         this.scoreboard.textContent = `Score: ${this.score}`;
     }
 
-    // updateSmokeParticles() {
-    //     this.smokeParticles.forEach((particle, index) => {
-    //         particle.sprite.position.add(particle.velocity);
-    //         particle.sprite.material.opacity -= 0.005;
-    //         particle.sprite.scale.multiplyScalar(1.01);
-    //         particle.life -= 1;
-
-    //         if (particle.life <= 0 || particle.sprite.material.opacity <= 0) {
-    //             this.scene.remove(particle.sprite);
-    //             this.smokeParticles.splice(index, 1);
-    //         }
-    //     });
-    // }
-
     updateClouds() {
         this.clouds.forEach((cloud, index) => {
-            cloud.position.z += this.playerSpeed * 0.5; // Move clouds slower than the player
+            cloud.position.z += this.playerSpeed * 0.5;
             if (cloud.position.z > this.player.mesh.position.z + 500) {
                 this.scene.remove(cloud);
                 this.clouds.splice(index, 1);
@@ -350,29 +324,56 @@ export default class Game {
             this.player.mesh.position.z - 200
         );
 
-        // Ensure the sun always faces the camera
         this.sunMesh.lookAt(this.camera.position);
     }
 
     gameOverHandler(message) {
         this.gameOver = true;
-        alert(message);
-        //this.speechRecognitionHandler.stopSpeechRecognition();
-    }
+        // Instead of alert, we show a leaderboard
+        // Save the current score
+        const currentScore = this.score;
 
-    // createSmokeParticle(position) {
-    //     const material = new THREE.SpriteMaterial({
-    //         map: this.smokeTexture,
-    //         transparent: true,
-    //         opacity: 0.5,
-    //         depthWrite: false,
-    //         depthTest: false,
-    //         blending: THREE.AdditiveBlending
-    //     });
-    //     const smoke = new THREE.Sprite(material);
-    //     smoke.position.copy(position);
-    //     smoke.scale.set(1, 1, 1);
-    //     this.scene.add(smoke);
-    //     return smoke;
-    // }
+        // Retrieve existing scores from localStorage
+        let scores = JSON.parse(localStorage.getItem('highScores') || '[]');
+
+        // Add the current score to the array
+        scores.push(currentScore);
+
+        // Sort and keep top 5
+        scores.sort((a, b) => b - a);
+        scores = scores.slice(0, 5);
+
+        // Save back to localStorage
+        localStorage.setItem('highScores', JSON.stringify(scores));
+
+        // Add coins
+        let coins = parseInt(localStorage.getItem('coins') || '0', 10);
+        coins += currentScore;
+        localStorage.setItem('coins', coins.toString());
+
+        // Show the leaderboard overlay
+        const leaderboardOverlay = document.getElementById('leaderboard-overlay');
+        const finalScoreElement = document.getElementById('final-score');
+        const leaderboardList = document.getElementById('leaderboard-list');
+
+        finalScoreElement.textContent = currentScore;
+
+        leaderboardList.innerHTML = '';
+        scores.forEach(score => {
+            const li = document.createElement('li');
+            li.textContent = score;
+            leaderboardList.appendChild(li);
+        });
+
+        leaderboardOverlay.style.display = 'block';
+
+        // Stop speech recognition if running
+        this.speechRecognitionHandler.stop();
+
+        // Add restart button functionality
+        const restartButton = document.getElementById('restart-button');
+        restartButton.addEventListener('click', () => {
+            location.reload();
+        });
+    }
 }

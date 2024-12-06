@@ -8,6 +8,8 @@
 - created homescreen
 - added in 3d model of a porsche as the user car
 - created subtitles to be able to pick up on words said by the surrounding environment. 
+- added local leaderboard (since firebase storage wasn't yet available)
+- added coins obtained from the score received each restart -- precursor to garage functionality
 
 Where this is headed:
 
@@ -19,7 +21,7 @@ P1:
 
 - Smoothen the movement of the user's car. The user car at times can go left to right slower than usual and also the movement looks weird and unnatural. Try to smoothen this movement by either getting rid of the car tilt that occurs when you press the left and right keys or smoothen out the tilt. 
 
-- Update the score to add more points and more points as time goes on (concave up on a graph). Also, convert the user's score to coins that the user obtains at the end of each round to then be able to purchase new cars.
+- Update the score to add more points and more points as time goes on (concave up on a graph).
 
 - add a garage feature where users can buy new cars. Also, create 3d models for a few cars that the user will be able to purchase with coins. Make it increasingly difficult to buy the later and later cars. 
 
@@ -31,7 +33,7 @@ P1:
 
 - add control Scheme class to control what button leads to different outcomes (boost, windshields wipers/honk in future)
 
-- add global leaderboard. 
+- update leaderboard to be global using firebase storage
 
 P2:
 
