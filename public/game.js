@@ -225,7 +225,7 @@ export default class Game {
             this.scene.add(this.copCar.mesh);
 
             // Create traffic cars
-            for (let i = 0; i < 150; i++) {
+            for (let i = 0; i < 500; i++) {
                 const trafficCar = new TrafficCar(this);
                 this.trafficCars.push(trafficCar);
                 this.scene.add(trafficCar.mesh);

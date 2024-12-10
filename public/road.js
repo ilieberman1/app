@@ -38,7 +38,7 @@ export default class Road {
                 line.rotation.x = -Math.PI / 2;
                 line.position.set(
                     xPos,
-                    0.01,
+                    0.15,
                     -this.roadLength / 2 + i * (lineLength + gapBetweenLines)
                 );
                 lineGroup.add(line);
