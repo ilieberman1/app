@@ -29,7 +29,7 @@ export default class Game {
         this.maxSpeed = 0.8;
         this.acceleration = 0.01;
         this.deceleration = 0.02;
-        this.copMaxSpeed = 0.65;//come back to change this 0.65
+        this.copMaxSpeed = 0.65;
         this.copAcceleration = 0.005;
         this.copCurrentSpeed = 0;
         this.currentRotationAngle = 0;
