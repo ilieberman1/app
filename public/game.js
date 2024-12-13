@@ -14,6 +14,7 @@ import gsap from 'gsap';
 export default class Game {
     constructor() {
         this.scene = new THREE.Scene();
+        this.clock = new THREE.Clock();
         this.camera = null;
         this.renderer = null;
         this.player = null;
@@ -25,10 +26,10 @@ export default class Game {
         this.score = 0;
         this.gameOver = false;
         this.playerSpeed = 0;
-        this.maxSpeed = 0.6;
+        this.maxSpeed = 0.8;
         this.acceleration = 0.01;
         this.deceleration = 0.02;
-        this.copMaxSpeed = 0.5;
+        this.copMaxSpeed = 0.65;//come back to change this 0.65
         this.copAcceleration = 0.005;
         this.copCurrentSpeed = 0;
         this.currentRotationAngle = 0;
@@ -261,15 +262,16 @@ export default class Game {
     }
 
     animate() {
-        if (this.gameOver || !this.player.mesh) return;
-
+        if (this.gameOver || !this.player?.mesh) return;
+    
         requestAnimationFrame(() => this.animate());
-
-        const deltaTime = 1;
+    
+        const deltaTime = this.clock.getDelta(); // This returns the time in seconds since the last frame
         this.update(deltaTime);
-
+    
         this.renderer.render(this.scene, this.camera);
     }
+    
 
     update(deltaTime) {
         this.player.update(deltaTime);

@@ -5,19 +5,34 @@ export default class TrafficCar {
     constructor(game) {
         this.game = game;
         this.mesh = this.createTrafficCar();
-        this.lane = this.game.lanePositions[Math.floor(Math.random() * this.game.lanePositions.length)];
+
+        const laneIndex = Math.floor(Math.random() * this.game.lanePositions.length);
+        this.lane = this.game.lanePositions[laneIndex];
+
+        // All cars start at same speed
+        this.speed = 15; 
+        this.maxSpeed = this.speed; 
+
+        // Initial tentative position
         this.mesh.position.set(
             this.lane,
             0.5,
             this.game.player.mesh.position.z + 100 + Math.random() * 5000
         );
-        this.speed = 0.2 + Math.random() * 0.2; // Random speed between 0.2 and 0.4
-        this.maxSpeed = this.speed;
-        this.targetLane = this.lane;
-        this.laneChangeCooldown = 0;
-        this.turnSignal = null;
+
+        // Ensure no car spawns too close to another car
+        // Increase the safe distance to ensure absolutely no hiccups
+        const safeDistance = 100; 
+        this.ensureSafeStartingDistance(safeDistance);
+
+        // Without lane changing, these are no longer needed
+        // this.laneChangeCooldown = 0;
+        // this.turnSignal = null;
+
+        this.stuckTimer = 0;
+        this.lastPosition = this.mesh.position.clone();
     }
-    //creates a traffic car 
+
     createTrafficCar() {
         const carGroup = new THREE.Group();
 
@@ -36,126 +51,129 @@ export default class TrafficCar {
             wheels[i] = new THREE.Mesh(wheelGeometry, wheelMaterial);
             wheels[i].rotation.z = Math.PI / 2;
         }
-        wheels[0].position.set(-0.7, 0.3, 1.3); // Front-left
-        wheels[1].position.set(0.7, 0.3, 1.3); // Front-right
-        wheels[2].position.set(-0.7, 0.3, -1.3); // Back-left
-        wheels[3].position.set(0.7, 0.3, -1.3); // Back-right
+        wheels[0].position.set(-0.7, 0.3, 1.3);
+        wheels[1].position.set(0.7, 0.3, 1.3);
+        wheels[2].position.set(-0.7, 0.3, -1.3);
+        wheels[3].position.set(0.7, 0.3, -1.3);
 
         wheels.forEach((wheel) => carGroup.add(wheel));
 
         return carGroup;
     }
-    //holds various different functions related to the movement of the traffic car. Ensures traffic cars act as traffic cars by maintaning distance, switching lanes, and trying to not collide with the user. Also generates their speed
+
+    ensureSafeStartingDistance(safeDistance) {
+        // If there's any other car too close in front, move this car forward until clear
+        let attempts = 0;
+        while (this.tooCloseToOtherCars(safeDistance) && attempts < 100) {
+            this.mesh.position.z += 50; // push it further ahead
+            attempts++;
+        }
+    }
+
+    tooCloseToOtherCars(distance) {
+        for (let i = 0; i < this.game.trafficCars.length; i++) {
+            const otherCar = this.game.trafficCars[i];
+            if (otherCar !== this) {
+                const dz = otherCar.mesh.position.z - this.mesh.position.z;
+                const dx = Math.abs(otherCar.mesh.position.x - this.mesh.position.x);
+                // If another car is ahead and within 'distance', return true
+                if (dz > 0 && dz < distance && dx < 1.0) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     update(deltaTime) {
-        // Move away the player
+        if (!deltaTime || deltaTime <= 0) return; // Ensure deltaTime is positive
+
+        const oldPosition = this.mesh.position.clone();
+
+        // Move forward at constant speed
         this.mesh.position.z += this.speed * deltaTime;
 
-        // Collision avoidance with other traffic cars
-        let carAhead = false;
-        let minDistance = Infinity;
+        // Maintain max speed (no lane changes or slowdowns)
+        this.speed = this.maxSpeed;
 
-        this.game.trafficCars.forEach((otherCar) => {
-            if (otherCar !== this) {
-                const distanceZ = this.mesh.position.z - otherCar.mesh.position.z;
-                const distanceX = Math.abs(otherCar.mesh.position.x - this.mesh.position.x);
-
-                if (distanceX < 0.5 && distanceZ > 0 && distanceZ < 10) {
-                    carAhead = true;
-                    minDistance = Math.min(minDistance, distanceZ);
-                }
-            }
-        });
-
-        // Adjust speed based on distance to car ahead
-        if (carAhead) {
-            const deceleration = (10 - minDistance) * 0.05 * deltaTime;
-            this.speed = Math.max(this.speed - deceleration, 0);
+        // Handle stuck situations (unlikely now)
+        if (this.speed < 1) {
+            this.stuckTimer += deltaTime;
         } else {
-            this.speed = Math.min(this.speed + 0.01 * deltaTime, this.maxSpeed);
+            this.stuckTimer = 0;
         }
 
-        // Lane changing logic (remains the same)
-        if (this.laneChangeCooldown <= 0 && Math.random() < 0.0005) {
-            // Decide to change lanes
-            const currentLaneIndex = this.game.lanePositions.indexOf(this.lane);
-            const possibleLanes = [];
-
-            // Check lanes on both sides
-            if (currentLaneIndex > 0) possibleLanes.push(currentLaneIndex - 1);
-            if (currentLaneIndex < this.game.lanePositions.length - 1) possibleLanes.push(currentLaneIndex + 1);
-
-            // Randomly pick a possible lane
-            while (possibleLanes.length > 0) {
-                const newLaneIndex = possibleLanes.splice(Math.floor(Math.random() * possibleLanes.length), 1)[0];
-                const targetLane = this.game.lanePositions[newLaneIndex];
-
-                // Check if lane is clear
-                let laneClear = true;
-                this.game.trafficCars.forEach((otherCar) => {
-                    if (otherCar !== this) {
-                        const distanceZ = Math.abs(otherCar.mesh.position.z - this.mesh.position.z);
-                        const distanceX = Math.abs(otherCar.mesh.position.x - targetLane);
-                        if (distanceX < 0.5 && distanceZ < 10) {
-                            laneClear = false;
-                        }
-                    }
-                });
-
-                if (laneClear) {
-                    this.targetLane = targetLane;
-                    this.turnSignal = targetLane > this.lane ? 'right' : 'left';
-                    this.laneChangeCooldown = 500;
-                    break;
-                }
-            }
+        if (this.stuckTimer > 5) {
+            this.resetCarPosition();
         }
 
-        // Apply lane change
-        if (this.lane !== this.targetLane) {
-            const laneDiff = this.targetLane - this.lane;
-            const shift = Math.sign(laneDiff) * 0.05 * deltaTime;
-            this.mesh.position.x += shift;
-            this.lane += shift;
-            if (Math.abs(this.lane - this.targetLane) < 0.1) {
-                this.lane = this.targetLane;
-                this.mesh.position.x = this.targetLane;
-                this.turnSignal = null;
-            }
-        } else {
-            this.turnSignal = null;
-        }
+        // No lane changing logic
+        // No turn signals
 
-        // Update turn signals
-        this.updateTurnSignals();
+        // Avoid player (if desired, we keep them at max speed anyway)
+        this.avoidPlayer(deltaTime);
 
-        // Reduce cooldown
-        if (this.laneChangeCooldown > 0) {
-            this.laneChangeCooldown -= deltaTime;
-        }
+        // Reset if behind player
+        this.resetIfBehindPlayer();
 
-        // Avoid collision with the player car
-        const distanceToPlayer = this.mesh.position.distanceTo(this.game.player.mesh.position);
-        if (this.mesh.position.z > this.game.player.mesh.position.z && distanceToPlayer < 10) {
-            if (distanceToPlayer < 5) {
-                this.speed = Math.max(this.speed - 0.05 * deltaTime, 0);
-            } else {
-                this.speed = Math.max(this.speed - 0.02 * deltaTime, 0.1);
-            }
-        } else {
-            this.speed = Math.min(this.speed + 0.01 * deltaTime, this.maxSpeed);
-        }
+        // Check overlaps (should never happen)
+        // if (this.checkOverlapWithCars()) {
+        //     this.mesh.position.copy(this.lastPosition);
+        // }
 
-        // Reset position if behind player
+        // Collision detection with player
+        this.checkCollisionWithPlayer();
+
+        // Update lastPosition
+        this.lastPosition.copy(oldPosition);
+    }
+
+    // Removed attemptLaneChange() and applyLaneChange() entirely
+
+    avoidPlayer(deltaTime) {
+        // Keep speed constant to avoid hiccups
+        this.speed = this.maxSpeed;
+    }
+
+    resetIfBehindPlayer() {
         if (this.mesh.position.z < this.game.player.mesh.position.z - 200) {
-            this.mesh.position.z = this.game.player.mesh.position.z + 500 + Math.random() * 1000;
-            this.lane = this.game.lanePositions[Math.floor(Math.random() * this.game.lanePositions.length)];
-            this.targetLane = this.lane;
-            this.mesh.position.x = this.lane;
-            this.speed = 0.2 + Math.random() * 0.2;
-            this.maxSpeed = this.speed;
-        }
+            const laneIndex = Math.floor(Math.random() * this.game.lanePositions.length);
+            const newLane = this.game.lanePositions[laneIndex];
 
-        // Collision detection with player car
+            this.mesh.position.z = this.game.player.mesh.position.z + 500 + Math.random() * 1000;
+            this.lane = newLane;
+            this.mesh.position.x = newLane;
+            this.speed = this.maxSpeed;
+            this.stuckTimer = 0;
+        }
+    }
+
+    resetCarPosition() {
+        const laneIndex = Math.floor(Math.random() * this.game.lanePositions.length);
+        const newLane = this.game.lanePositions[laneIndex];
+
+        this.mesh.position.z = this.game.player.mesh.position.z + 2000 + Math.random() * 1000;
+        this.lane = newLane;
+        this.mesh.position.x = newLane;
+        this.speed = this.maxSpeed;
+        this.stuckTimer = 0;
+    }
+
+    checkOverlapWithCars() {
+        for (let i = 0; i < this.game.trafficCars.length; i++) {
+            const otherCar = this.game.trafficCars[i];
+            if (otherCar !== this) {
+                const dx = this.mesh.position.x - otherCar.mesh.position.x;
+                const dz = this.mesh.position.z - otherCar.mesh.position.z;
+                if (Math.abs(dx) < 1.4 && Math.abs(dz) < 2.8) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    checkCollisionWithPlayer() {
         if (
             Math.abs(this.game.player.mesh.position.x - this.mesh.position.x) < 1.2 &&
             Math.abs(this.game.player.mesh.position.z - this.mesh.position.z) < 4
@@ -163,37 +181,6 @@ export default class TrafficCar {
             this.game.gameOverHandler('You crashed into a car! Game Over!');
         }
     }
-    // updates the turn signals on the traffic cars. 
-    updateTurnSignals() {
-        if (!this.turnSignal) {
-            // Remove existing signals
-            if (this.leftSignal) {
-                this.mesh.remove(this.leftSignal);
-                this.leftSignal = null;
-            }
-            if (this.rightSignal) {
-                this.mesh.remove(this.rightSignal);
-                this.rightSignal = null;
-            }
-            return;
-        }
 
-        const signalColor = 0xffff00; // Yellow color for turn signals
-        const signalGeometry = new THREE.BoxGeometry(0.2, 0.2, 0.1);
-        const signalMaterial = new THREE.MeshBasicMaterial({ color: signalColor });
-
-        if (this.turnSignal === 'left') {
-            if (!this.leftSignal) {
-                this.leftSignal = new THREE.Mesh(signalGeometry, signalMaterial);
-                this.leftSignal.position.set(-0.8, 0.5, -1.5);
-                this.mesh.add(this.leftSignal);
-            }
-        } else if (this.turnSignal === 'right') {
-            if (!this.rightSignal) {
-                this.rightSignal = new THREE.Mesh(signalGeometry, signalMaterial);
-                this.rightSignal.position.set(0.8, 0.5, -1.5);
-                this.mesh.add(this.rightSignal);
-            }
-        }
-    }
+    // updateTurnSignals() removed completely since no lane changes or signals
 }
